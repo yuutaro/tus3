@@ -17,7 +17,6 @@ public class AIClient {
   private Socket pySocket;
   private PrintWriter pyOut;
   private BufferedReader pyIn;
-  private String pythonScriptPath = "./test.py";
 
   private int myColor;
   private int currentTurn;
@@ -80,10 +79,24 @@ public class AIClient {
         try {
           String line;
           while ((line = pyIn.readLine()) != null) {
-            System.out.println("Python process: " + line);
+            handlePyServerMessage(line);
           }
         } catch (IOException e) {
           e.printStackTrace();
+        }
+      }
+    }).start();
+
+    // 定期的にpythonプロセスに"hello"を送信
+    new Thread(new Runnable() {
+      public void run() {
+        while (true) {
+          try {
+            Thread.sleep(1000);
+            sayHello();
+          } catch (InterruptedException e) {
+            e.printStackTrace();
+          }
         }
       }
     }).start();
@@ -128,6 +141,8 @@ public class AIClient {
 
         // 自分のターンのときに石を置く処理を以下に記載
         if (currentTurn == myColor) {
+          sayHello();
+          // sendBoardToPython(board);
           int[] selectedMove = randomPut(board, myColor);
           if (selectedMove != null) {
             out.println("PUT " + selectedMove[0] + " " + selectedMove[1]);
@@ -167,6 +182,9 @@ public class AIClient {
 
       case "END":
         System.out.println("ゲーム終了: " + message.substring(4) + "\n");
+        // Pythonプロセスを終了
+        pyOut.println("CLOSE");
+
         System.exit(0);
         break;
 
@@ -178,6 +196,15 @@ public class AIClient {
         System.out.println("不明なメッセージが送られてきました。\n");
         System.out.println(message + "\n");
         break;
+    }
+  }
+
+  private void handlePyServerMessage(String message) {
+    if (message == null) {
+      System.out.println("Pythonプロセスからのメッセージがnullです。\n");
+      return;
+    } else {
+      System.out.println("Python Process: " + message + "\n");
     }
   }
 
@@ -271,7 +298,7 @@ public class AIClient {
     return selectedMove;
   }
 
-  // int [8][8] -> "[[0,0,0,0,0,0,0,0,0][1,1,1,1,1,1,1,1,1]...]"
+  // int [8][8] -> "[[0,0,0,0,0,0,0,0,0],[1,1,1,1,1,1,1,1,1], ... , [8,8,8,8,8,8,8,8]]"
   private String boardToString(int[][] board) {
     StringBuilder sb = new StringBuilder();
     sb.append("[");
@@ -292,11 +319,26 @@ public class AIClient {
     return sb.toString();
   }
 
+  private int[][] stringToBoard(String str) {
+    int[][] board = new int[8][8];
+    String[] rows = str.split("],");
+    for (int i = 0; i < 8; i++) {
+      String[] cells = rows[i].split(",");
+      for (int j = 0; j < 8; j++) {
+        board[i][j] = Integer.parseInt(cells[j]);
+      }
+    }
+    return board;
+  }
+
   // Pythonプロセスに盤面を送信する関数
   private void sendBoardToPython(int[][] board) {
     pyOut.println(boardToString(board));
   }
 
+  private void sayHello() {
+    pyOut.println("hello");
+  }
   public static void main(String args[]) {
     if (args.length != 2) {
       System.out.println("Usage: java AIClient <server address> <server port>");
