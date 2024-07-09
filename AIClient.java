@@ -80,7 +80,7 @@ public class AIClient {
         try {
           String line;
           while ((line = pyIn.readLine()) != null) {
-            System.out.println("Pythonからのメッセージ: " + line);
+            System.out.println("Python process: " + line);
           }
         } catch (IOException e) {
           e.printStackTrace();
@@ -271,8 +271,30 @@ public class AIClient {
     return selectedMove;
   }
 
-  private void sayhello() {
-    pyOut.println("hello");
+  // int [8][8] -> "[[0,0,0,0,0,0,0,0,0][1,1,1,1,1,1,1,1,1]...]"
+  private String boardToString(int[][] board) {
+    StringBuilder sb = new StringBuilder();
+    sb.append("[");
+    for (int i = 0; i < 8; i++) {
+      sb.append("[");
+      for (int j = 0; j < 8; j++) {
+        sb.append(board[i][j]);
+        if (j != 7) {
+          sb.append(",");
+        }
+      }
+      sb.append("]");
+      if (i != 7) {
+        sb.append(",");
+      }
+    }
+    sb.append("]");
+    return sb.toString();
+  }
+
+  // Pythonプロセスに盤面を送信する関数
+  private void sendBoardToPython(int[][] board) {
+    pyOut.println(boardToString(board));
   }
 
   public static void main(String args[]) {
@@ -280,8 +302,6 @@ public class AIClient {
       System.out.println("Usage: java AIClient <server address> <server port>");
       System.exit(1);
     }
-    AIClient client = new AIClient(args[0], Integer.parseInt(args[1]));
-
-    client.sayhello();
+    new AIClient(args[0], Integer.parseInt(args[1]));
   }
 }
