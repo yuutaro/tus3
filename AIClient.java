@@ -14,6 +14,11 @@ public class AIClient {
   private PrintWriter out;
   private BufferedReader in;
 
+  private Socket pySocket;
+  private PrintWriter pyOut;
+  private BufferedReader pyIn;
+  private String pythonScriptPath = "./test.py";
+
   private int myColor;
   private int currentTurn;
   private int[][] board = new int[8][8];
@@ -32,6 +37,30 @@ public class AIClient {
       System.exit(1);
     }
 
+    try {
+      // Pythonプロセス起動
+      ProcessBuilder pb = new ProcessBuilder("python3", "test.py");
+      pb.start();
+
+      // Pythonプロセスとの通信用ソケットとIO
+      boolean connected = false;
+      while (!connected) {
+        try {
+          pySocket = new Socket("localhost", 12345);
+          connected = true;
+        } catch (Exception e) {
+          System.out.println("Pythonプロセスとの接続に失敗しました。再接続を試みます。");
+          Thread.sleep(1000);
+        }
+      }
+      pyOut = new PrintWriter(pySocket.getOutputStream(), true);
+      pyIn = new BufferedReader(new InputStreamReader(pySocket.getInputStream()));
+      System.out.println("Pythonプロセスとの接続が確立されました。");
+    } catch (Exception e) {
+      System.out.println("Pythonプロセス立ち上げ失敗");
+      System.exit(1);
+    }
+
     // サーバーからのオセロ対戦通信受信部分追加
     new Thread(new Runnable() {
       public void run() {
@@ -45,6 +74,20 @@ public class AIClient {
         }
       }
     }).start();
+
+    new Thread(new Runnable() {
+      public void run() {
+        try {
+          String line;
+          while ((line = pyIn.readLine()) != null) {
+            System.out.println("Pythonからのメッセージ: " + line);
+          }
+        } catch (IOException e) {
+          e.printStackTrace();
+        }
+      }
+    }).start();
+
   }
 
   private void handleServerMessage(String message) {
@@ -124,6 +167,7 @@ public class AIClient {
 
       case "END":
         System.out.println("ゲーム終了: " + message.substring(4) + "\n");
+        System.exit(0);
         break;
 
       case "CLOSE":
@@ -227,11 +271,17 @@ public class AIClient {
     return selectedMove;
   }
 
+  private void sayhello() {
+    pyOut.println("hello");
+  }
+
   public static void main(String args[]) {
     if (args.length != 2) {
       System.out.println("Usage: java AIClient <server address> <server port>");
       System.exit(1);
     }
-    new AIClient(args[0], Integer.parseInt(args[1]));
+    AIClient client = new AIClient(args[0], Integer.parseInt(args[1]));
+
+    client.sayhello();
   }
 }

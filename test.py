@@ -1,36 +1,38 @@
 import socket
-import pickle
-import numpy as np
+import threading
+
+def handle_client(client_socket):
+    while True:
+        try:
+            # クライアントからのメッセージを受け取る
+            message = client_socket.recv(1024).decode('utf-8')
+            if not message:
+                break
+
+            # メッセージが "hello" の場合の応答
+            if message.strip() == "hello":
+                client_socket.send("hello".encode('utf-8'))
+            else:
+                client_socket.send("I only respond to 'hello'.".encode('utf-8'))
+        except:
+            break
+
+    # 接続を閉じる
+    client_socket.close()
 
 def main():
-    # ソケット接続を確立
-    host = 'localhost'
-    port = 12345
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind(("localhost", 12345))
+    server.listen(5)
+    print("Server started on port 12345")
 
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.connect((host, port))
+    while True:
+        client_socket, addr = server.accept()
+        print(f"Connection from {addr}")
 
-        while True:
-            try:
-                # Javaプロセスからデータを受信
-                data = s.recv(4096)
-                if not data:
-                    break
-
-                # 受信したデータをnumpy配列に変換
-                int_array = pickle.loads(data)
-                
-                # int配列をfloat配列に変換
-                float_array = np.array(int_array, dtype=np.float64)
-
-                # 変換した配列をJavaプロセスに送り返す
-                s.sendall(pickle.dumps(float_array))
-
-            except EOFError:
-                break
-            except Exception as e:
-                print(f"Error: {e}")
-                break
+        # 新しいスレッドを作成してクライアントを処理
+        client_handler = threading.Thread(target=handle_client, args=(client_socket,))
+        client_handler.start()
 
 if __name__ == "__main__":
     main()
